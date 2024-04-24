@@ -1,0 +1,82 @@
+from multiprocessing import Process, Queue, Lock
+
+class Graph:
+    def __init__(self, vertices):
+        self.vertices = vertices
+        self.adj = [[] for _ in range(vertices)]
+
+    def add_edge(self, u, v):
+        self.adj[u].append(v)
+
+    def bfs(self, start, result_queue, lock):
+        visited = [False] * self.vertices
+        queue = [start]
+        visited[start] = True
+
+        while queue:
+            u = queue.pop(0)
+            lock.acquire()
+            result_queue.put(u)
+            lock.release()
+
+            for v in self.adj[u]:
+                if not visited[v]:
+                    visited[v] = True
+                    queue.append(v)
+
+    def dfs_util(self, u, visited, result_queue, lock):
+        visited[u] = True
+        lock.acquire()
+        result_queue.put(u)
+        lock.release()
+
+        for v in self.adj[u]:
+            if not visited[v]:
+                self.dfs_util(v, visited, result_queue, lock)
+
+    def dfs(self, start, result_queue, lock):
+        visited = [False] * self.vertices
+        self.dfs_util(start, visited, result_queue, lock)
+
+
+if __name__ == "__main__":
+    # Take input for number of vertices and edges
+    num_vertices = int(input("Enter the number of vertices: "))
+    g = Graph(num_vertices)
+
+    # Take input for edges
+    num_edges = int(input("Enter the number of edges: "))
+    print("Enter the edges in the format 'u v', where u and v are vertices:")
+    for _ in range(num_edges):
+        u, v = map(int, input().split())
+        g.add_edge(u, v)
+
+    # Take input for the starting vertex
+    start_vertex = int(input("Enter the starting vertex: "))
+
+    # Perform BFS and DFS traversal using separate processes
+    result_queue_bfs = Queue()
+    result_queue_dfs = Queue()
+    lock = Lock()
+
+    bfs_process = Process(target=g.bfs, args=(start_vertex, result_queue_bfs, lock))
+    dfs_process = Process(target=g.dfs, args=(start_vertex, result_queue_dfs, lock))
+
+    bfs_process.start()
+    dfs_process.start()
+
+    bfs_process.join()
+    dfs_process.join()
+
+    # Print BFS traversal results
+    print("BFS Traversal (starting from vertex", start_vertex, "):", end=" ")
+    while not result_queue_bfs.empty():
+        print(result_queue_bfs.get(), end=" ")
+    print()
+
+    # Print DFS traversal results
+    print("DFS Traversal (starting from vertex", start_vertex, "):", end=" ")
+    while not result_queue_dfs.empty():
+        print(result_queue_dfs.get(), end=" ")
+    print()
+
